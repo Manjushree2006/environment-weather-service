@@ -1,0 +1,88 @@
+LEAFLINE WEATHER SERVICE - COMPLETE PROJECT
+============================================
+
+This ZIP contains the complete backend, frontend, configuration and the SQLite database
+for the Leafline Weather Service (formerly Environment & Weather Service).
+
+NEW CAPABILITIES IN V2.0
+------------------------
+1. Microservice Renamed: Full transition to "Leafline Weather Service".
+2. Three-Tier Account System:
+   - Administrator Login (full administrative controls, user and org management, audit logs)
+   - Individual User Registration & Login (unique User ID, personal sensor registration, isolated data)
+   - Organization Registration, Approval Tracking, and Login (Request IDs, admin approval workflow)
+3. Weather Analysis Dashboard:
+   - Clear visual distinction with "FORECAST" cards (top) and "SENSOR DATA" cards (bottom)
+4. Sensor Management:
+   - Complete metadata collection: Sensor Name, Type, Manufacturer, Model, Measurement Type, Unit, User, Location, Device ID
+   - Interactive reading submission from dashboard or IoT HTTP endpoint (X-Sensor-Key)
+5. Historical Data & Role Isolation:
+   - User-level data isolation (users cannot access others' records)
+   - Organization-level data isolation (organizations only access affiliated users)
+   - Admin-level complete access
+6. Verifiable PDF Reports:
+   - Dedicated "Data Export / Reports" dashboard for organizations
+   - Filter by date range, user, sensor, measurement parameters
+   - Live data preview and one-click downloadable PDF report with Leafline branding
+
+IMPORTANT DATA STORAGE
+----------------------
+The database is:
+backend\environment_weather.db
+
+The backend automatically creates new tables (users, organizations) and adds any missing
+columns to existing tables without deleting any existing records. Data submitted through
+the running application is persisted in this SQLite database.
+
+FIRST RUN - BACKEND (Windows CMD)
+---------------------------------
+Open Command Prompt in the backend folder:
+
+    cd /d F:\Leafline\Envirnoment\Leafline_Environment_Weather_Service_Implemented\backend
+    python -m venv venv
+    venv\Scripts\activate
+    pip install -r requirements.txt
+    python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+
+Or simply double-click:
+    START_BACKEND.bat
+
+Backend Documentation / Swagger URL:
+    http://127.0.0.1:8001/docs
+
+FIRST RUN - FRONTEND (Windows CMD)
+----------------------------------
+Open a second Command Prompt in the frontend folder:
+
+    cd /d F:\Leafline\Envirnoment\Leafline_Environment_Weather_Service_Implemented\frontend
+    npm install
+    npm run dev
+
+Or simply double-click:
+    START_FRONTEND.bat
+
+Open the frontend URL:
+    http://localhost:5173
+
+DEFAULT DEMO CREDENTIALS
+------------------------
+1. Administrator:
+   - Key: Leafline@123
+2. Individual User:
+   - Email: ramesh.kumar@leafline.ag  (or User ID: USR1)
+   - Password: password123
+   - Secondary User: priya.sharma@leafline.ag (or USR2), password: password123
+3. Approved Organization:
+   - Request ID / Org ID / Email: RQ1 or ORG1 or agritech@karnataka.gov.in
+   - Password: password123
+4. Pending Organization (for testing pending block):
+   - Request ID: RQ2
+   - Password: password123
+5. Rejected Organization (for testing rejected block):
+   - Request ID: RQ3
+   - Password: password123
+
+PROJECT CONTENTS
+----------------
+backend/   FastAPI application, API routers, services, models, requirements.txt, .env, SQLite DB
+frontend/  Vite/React application source, App.jsx, styles.css, package.json
