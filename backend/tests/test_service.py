@@ -1,8 +1,11 @@
+
 from unittest.mock import AsyncMock, patch
 from datetime import datetime, timezone, date
 
+
 def auth(t):
     return {'Authorization': f'Bearer {t}'}
+
 
 def test_health(client):
     r = client.get('/api/health')
@@ -10,10 +13,12 @@ def test_health(client):
     assert r.json()['status'] == 'online'
     assert r.json()['service'] == 'Leafline Weather Service'
 
+
 def test_local_dev_token(client):
     r = client.post('/api/dev/token', json={'role': 'admin'})
     assert r.status_code == 200
     assert r.json()['token_type'] == 'bearer'
+
 
 def test_weather_current_persists(client, token):
     payload = {
@@ -27,10 +32,14 @@ def test_weather_current_persists(client, token):
         'source': 'open-meteo'
     }
     with patch('app.routers.weather.fetch_current', new=AsyncMock(return_value=payload)):
-        r = client.get('/api/weather/current?latitude=12.9716&longitude=77.5946', headers=auth(token))
+        r = client.get(
+            '/api/weather/current?latitude=12.9716&longitude=77.5946',
+            headers=auth(token)
+        )
     assert r.status_code == 200
     assert r.json()['temperatureC'] == 28.1
     assert r.json()['stale'] is False
+
 
 def test_forecast(client, token):
     payload = [{
@@ -42,13 +51,28 @@ def test_forecast(client, token):
         'wind_speed_max_kmh': 12
     }]
     with patch('app.routers.weather.fetch_forecast', new=AsyncMock(return_value=payload)):
-        r = client.get('/api/weather/forecast?latitude=12.97&longitude=77.59&days=1', headers=auth(token))
+        r = client.get(
+            '/api/weather/forecast?latitude=12.97&longitude=77.59&days=1',
+            headers=auth(token)
+        )
     assert r.status_code == 200
     assert len(r.json()['days']) == 1
 
+
 def test_sensor_registration_and_ingestion(client, token):
-    h = auth(token)
-    reg = client.post('/api/admin/sensors', headers=h, json={
+    # Generate a user token because sensor registration is user-only
+    user_response = client.post('/api/dev/token', json={
+        'role': 'user',
+        'subject': 'test-user',
+        'field_ids': ['field-demo']
+    })
+
+    assert user_response.status_code == 200
+    user_token = user_response.json()['access_token']
+    registration_headers = auth(user_token)
+
+    # Register sensor as an individual user
+    reg = client.post('/api/admin/sensors', headers=registration_headers, json={
         'deviceId': 'sensor-01',
         'name': 'Field sensor',
         'fieldId': 'field-demo',
@@ -58,29 +82,50 @@ def test_sensor_registration_and_ingestion(client, token):
         'measurementType': 'Temperature & Humidity',
         'measurementUnit': '°C / %'
     })
+
     assert reg.status_code == 201
     key = reg.json()['sensorKey']
 
-    reading = client.post('/api/sensor-data', headers={'X-Sensor-Key': key}, json={
+    # Submit sensor reading using the sensor API key
+    reading = client.post('/api/sensor-data', headers={
+        'X-Sensor-Key': key
+    }, json={
         'deviceId': 'sensor-01',
         'fieldId': 'field-demo',
         'temperatureC': 29,
         'humidityPct': 65
     })
+
     assert reading.status_code == 201
 
-    history = client.get('/api/environmental-data/history?fieldId=field-demo', headers=h)
+    # Retrieve history using the same user token
+    history = client.get(
+        '/api/environmental-data/history?fieldId=field-demo',
+        headers=registration_headers
+    )
+
     assert history.status_code == 200
     assert history.json()['total'] == 1
 
+
 def test_operator_scope(client):
-    tok = client.post('/api/dev/token', json={'role': 'field_operator', 'field_ids': ['field-A']}).json()['access_token']
-    r = client.post('/api/sensor-data/operator', headers=auth(tok), json={'fieldId': 'field-B', 'temperatureC': 28})
+    tok = client.post('/api/dev/token', json={
+        'role': 'field_operator',
+        'field_ids': ['field-A']
+    }).json()['access_token']
+
+    r = client.post(
+        '/api/sensor-data/operator',
+        headers=auth(tok),
+        json={'fieldId': 'field-B', 'temperatureC': 28}
+    )
     assert r.status_code == 403
+
 
 def test_missing_weather_token(client):
     r = client.get('/api/weather/current?latitude=12&longitude=77')
     assert r.status_code == 401
+
 
 def test_user_registration_and_login(client):
     reg = client.post('/api/auth/user/register', json={
@@ -104,6 +149,7 @@ def test_user_registration_and_login(client):
     assert login.status_code == 200
     assert login.json()['role'] == 'user'
     assert login.json()['userId'] == user_id
+
 
 def test_organization_approval_workflow(client, token):
     # 1. Organization submits registration request
@@ -133,7 +179,10 @@ def test_organization_approval_workflow(client, token):
     assert blocked_login.status_code == 403
 
     # 4. Administrator approves the organization
-    approval = client.post(f'/api/admin/organizations/{req_id}/accept', headers=auth(token))
+    approval = client.post(
+        f'/api/admin/organizations/{req_id}/accept',
+        headers=auth(token)
+    )
     assert approval.status_code == 200
     assert approval.json()['status'] == 'Accepted'
     org_id = approval.json()['organizationId']
@@ -148,6 +197,7 @@ def test_organization_approval_workflow(client, token):
     assert approved_login.json()['role'] == 'organization'
     assert approved_login.json()['organizationId'] == org_id
 
+
 def test_organization_rejected_workflow(client, token):
     reg = client.post('/api/auth/org/register', json={
         'organizationName': 'Disallowed Traders',
@@ -160,13 +210,20 @@ def test_organization_rejected_workflow(client, token):
     req_id = reg.json()['requestId']
 
     # Reject
-    rej = client.post(f'/api/admin/organizations/{req_id}/reject', headers=auth(token))
+    rej = client.post(
+        f'/api/admin/organizations/{req_id}/reject',
+        headers=auth(token)
+    )
     assert rej.status_code == 200
     assert rej.json()['status'] == 'Rejected'
 
     # Login blocked
-    r = client.post('/api/auth/org/login', json={'identifier': req_id, 'password': 'password123'})
+    r = client.post('/api/auth/org/login', json={
+        'identifier': req_id,
+        'password': 'password123'
+    })
     assert r.status_code == 403
+
 
 def test_pdf_report_generation(client, token):
     # Register org & approve
@@ -178,8 +235,16 @@ def test_pdf_report_generation(client, token):
         'password': 'password123'
     })
     req_id = reg.json()['requestId']
-    client.post(f'/api/admin/organizations/{req_id}/accept', headers=auth(token))
-    login = client.post('/api/auth/org/login', json={'identifier': req_id, 'password': 'password123'})
+
+    client.post(
+        f'/api/admin/organizations/{req_id}/accept',
+        headers=auth(token)
+    )
+
+    login = client.post('/api/auth/org/login', json={
+        'identifier': req_id,
+        'password': 'password123'
+    })
     org_token = login.json()['access_token']
 
     # Generate PDF
