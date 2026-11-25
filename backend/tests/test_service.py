@@ -83,7 +83,7 @@ def test_sensor_registration_and_ingestion(client, token):
         'measurementUnit': '°C / %'
     })
 
-    assert reg.status_code == 201
+    assert reg.status_code == 201, f"Sensor registration failed: {reg.status_code} - {reg.text}"
     key = reg.json()['sensorKey']
 
     # Submit sensor reading using the sensor API key
@@ -96,7 +96,7 @@ def test_sensor_registration_and_ingestion(client, token):
         'humidityPct': 65
     })
 
-    assert reading.status_code == 201
+    assert reading.status_code == 201, f"Sensor reading failed: {reading.status_code} - {reading.text}"
 
     # Retrieve history using the same user token
     history = client.get(
